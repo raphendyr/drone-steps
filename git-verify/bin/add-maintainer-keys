@@ -1,0 +1,43 @@
+#!/bin/sh
+set -e
+
+export GNUPGHOME=$MAINTAINER_KEYS_HOME
+
+# This ensure the GNUPGHOME is created
+mkdir -m 0700 -p "$GNUPGHOME"
+gpg --homedir "$GNUPGHOME" --quiet --list-keys >/dev/null
+
+import_key() {
+	# 1=KEY_ID 2=KEY_FILE
+	[ -e "$2" ] || { echo "Warning: Missing key '$2'" >&2; return; }
+
+	keyid=$(gpg --homedir "$GNUPGHOME" --dry-run --with-colons --import-options show-only --import "$2" | awk -F: '/^fpr:/ {print $10; exit}')
+	[ "$keyid" ] || { echo "Warning: Invalid key '$2'" >&2; return; }
+
+	[ "$1" = "$keyid" ] || { echo "ERROR: Mismatching key in '$2', expected $1 got $keyid" >&2; exit 1; }
+
+	# import
+	gpg --homedir "$GNUPGHOME" --quiet --import "$2"
+
+	# trust
+	echo -e "5\ny\n" \
+		| gpg --homedir "$GNUPGHOME" \
+			--quiet --no-greeting --no-tty --command-fd 0 \
+			--expert --edit-key "$1" trust
+}
+
+for key in $MAINTAINER_KEYS; do
+	keyfile="$key$MAINTAINER_KEYS_EXT"
+	if [ "$MAINTAINER_KEYS_BASE" ]; then
+		import_key "$key" "$MAINTAINER_KEYS_BASE/$keyfile"
+	else
+		find . -type f -iname "$keyfile" -print | while read filename; do
+			import_key "$key" "$filename"
+		done
+	fi
+done
+
+echo "List of trusted maintainer keys:"
+gpg --homedir "$GNUPGHOME" --quiet --list-keys
+
+exit 0

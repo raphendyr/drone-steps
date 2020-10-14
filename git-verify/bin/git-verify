@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+export GNUPGHOME=$MAINTAINER_KEYS_HOME
+
+echo "Verifying signature for tag $COMMIT_TAG":
+exec git verify-tag "$COMMIT_TAG"
