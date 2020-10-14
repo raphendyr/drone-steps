@@ -30,7 +30,7 @@ fi
 
 gpg --quiet --import "$name"
 
-if [ "${DEBSIGN_EXPORT_KEY:-}" ]; then
+if [ "${DEBSIGN_EXPORT_KEY_FILE:-}" ]; then
     gpg --armor --export-options export-minimal --export "$keyid" > "$DEBSIGN_EXPORT_KEY_FILE"
 fi
 
