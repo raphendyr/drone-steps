@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+
+key=${1:-DEBSIGN_KEY}
+name=
+
+if [ "${key%/*}" = "$key" ]; then
+    eval "CONTENT=\${$key}"
+    if [ "$CONTENT" ]; then
+        name="/run/secret/$key"
+        mkdir -p "/run/secret/"
+        touch "$name" && chmod 0700 "$name"
+        echo "$CONTENT" > "$name"
+    fi
+elif [ -e "$key" ]; then
+    name="$key"
+fi
+
+if [ -z "$name" ]; then
+    echo "GPG key source '$key' doesn't appear to be a file or an environment variable" >&2
+    exit 1
+fi
+
+gpg --quiet --list-keys >/dev/null 2>&1
+keyid=$(gpg --dry-run --with-colons --import-options show-only --import "$name" | awk '-F:' '/^fpr:/ {print $10; exit}')
+if [ -z "$keyid" ]; then
+    echo "Invalid GPG key from '$key'." >&2
+    exit 1
+fi
+
+gpg --quiet --import "$name"
+
+if [ "${DEBSIGN_EXPORT_KEY:-}" ]; then
+    gpg --armor --export-options export-minimal --export "$keyid" > "$DEBSIGN_EXPORT_KEY_FILE"
+fi
+
+
+echo "DEBSIGN_KEYID=\"$keyid\"" >> /root/.devscripts
